@@ -22,16 +22,19 @@ class Account:
 
     """
 
-    ENDPOINT = 'https://beehive.neatocloud.com/'
-
-    def __init__(self, email, password):
+    def __init__(self, email, password, vorwerk_mode=False):
         """Initialize the account data."""
         self._robots = set()
         self.robot_serials = {}
         self._maps = {}
         self._headers = {'Accept': 'application/vnd.neato.nucleo.v1'}
-        self._login(email, password)
         self._persistent_maps = {}
+        self._vorwerk_mode = vorwerk_mode
+        self._endpoint = 'https://beehive.neatocloud.com/'
+        if self._vorwerk_mode:
+          self._endpoint = 'https://vorwerk-beehive-production.herokuapp.com/'
+        self._login(email, password)
+
 
     def _login(self, email, password):
         """
@@ -41,11 +44,12 @@ class Account:
         :param password: Password for pybotvac account
         :return:
         """
-        response = requests.post(urljoin(self.ENDPOINT, 'sessions'),
+        response = requests.post(urljoin(self._endpoint, 'sessions'),
                                  json={'email': email,
                                        'password': password,
                                        'platform': 'ios',
                                        'token': binascii.hexlify(os.urandom(64)).decode('utf8')},
+                                 verify=False,
                                  headers=self._headers)
 
         response.raise_for_status()
@@ -84,7 +88,8 @@ class Account:
         """
         for robot in self.robots:
             resp2 = (
-                requests.get(urljoin(self.ENDPOINT, 'users/me/robots/{}/maps'.format(robot.serial)),
+                requests.get(urljoin(self._endpoint, 'users/me/robots/{}/maps'.format(robot.serial)),
+                             verify=False,
                              headers=self._headers))
             resp2.raise_for_status()
             self._maps.update({robot.serial: resp2.json()})
@@ -95,8 +100,8 @@ class Account:
 
         :return:
         """
-        resp = requests.get(urljoin(self.ENDPOINT, 'dashboard'),
-                            headers=self._headers)
+        resp = requests.get(urljoin(self._endpoint, 'dashboard'),
+                            headers=self._headers, verify=False)
         resp.raise_for_status()
 
         for robot in resp.json()['robots']:
@@ -108,6 +113,7 @@ class Account:
                                        serial=robot['serial'],
                                        secret=robot['secret_key'],
                                        traits=robot['traits'],
+                                       vorwerk=self._vorwerk_mode,
                                        endpoint=robot['nucleo_url']))
             except requests.exceptions.HTTPError:
                 print ("Your '{}' robot is offline.".format(robot['name']))
@@ -124,7 +130,7 @@ class Account:
 
         :return:
         """
-        image = requests.get(url, stream=True, timeout=10)
+        image = requests.get(url, stream=True, timeout=10, verify=False)
 
         if dest_path:
             image_url = url.rsplit('/', 2)[1] + '-' + url.rsplit('/', 1)[1]
@@ -156,8 +162,9 @@ class Account:
         """
         for robot in self._robots:
             resp2 = (requests.get(urljoin(
-                self.ENDPOINT,
+                self._endpoint,
                 'users/me/robots/{}/persistent_maps'.format(robot.serial)),
+                verify=False,
                 headers=self._headers))
             resp2.raise_for_status()
             self._persistent_maps.update({robot.serial: resp2.json()})

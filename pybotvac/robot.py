@@ -20,7 +20,7 @@ class Robot:
 
     def __init__(self, serial, secret, traits, name='',
                  endpoint='https://nucleo.neatocloud.com:4443',
-                 has_persistent_maps=False):
+                 has_persistent_maps=False, vorwerk=False):
         """
         Initialize robot
 
@@ -35,8 +35,16 @@ class Robot:
         self.traits = traits
         self.has_persistent_maps = has_persistent_maps
 
-        self._url = '{endpoint}/vendors/neato/robots/{serial}/messages'.format(
+        if vorwerk:
+          self._endpoint = 'https://nucleo.ksecosys.com'
+          self._vendor = 'vorwerk'
+        else:
+          self._endpoint = endpoint
+          self._vendor = 'neato'
+
+        self._url = '{endpoint}/vendors/{vendor}/robots/{serial}/messages'.format(
             endpoint=re.sub(':\d+', '', endpoint),  # Remove port number
+            vendor=self._vendor,
             serial=self.serial)
         self._headers = {'Accept': 'application/vnd.neato.nucleo.v1'}
 
@@ -54,9 +62,13 @@ class Robot:
         """
 
         cert_path = os.path.join(os.path.dirname(__file__), 'cert', 'neatocloud.com.crt')
+        if self._vendor == 'vorwerk':
+          cert_path = os.path.join(os.path.dirname(__file__), 'cert', 'nucleo.ksecosys.com.crt')
         response = requests.post(self._url,
                                  json=json,
-                                 verify=cert_path,
+                                 verify=False,
+#                                 verify=cert_path,
+#                                 cert=cert_path,
                                  auth=Auth(self.serial, self.secret),
                                  headers=self._headers)
         response.raise_for_status()
